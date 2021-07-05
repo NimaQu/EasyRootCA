@@ -14,17 +14,17 @@ import config
 def load_ca_file(file_type):
     try:
         if file_type == 'cert':
-            with open("rootCA_cert.crt", "rb") as f:
+            with open("root_cert.crt", "rb") as f:
                 return x509.load_pem_x509_certificate(f.read())
     except FileNotFoundError:
-        print("Can't find root cert File")
+        print("Can't find root cert File, it should be called root_cert.crt in the same directory.")
         exit(114514)
     try:
         if file_type == 'key':
-            with open("rootCA_key.pem", "rb") as f:
+            with open("root_key.pem", "rb") as f:
                 return serialization.load_pem_private_key(f.read(), None)
     except FileNotFoundError:
-        print("Can't find root key file")
+        print("Can't find root key file, it should be called root_cert.cert in the same directory.")
         exit(114514)
 
 
@@ -116,10 +116,7 @@ def user_input_alt_name():
 
 def main():
     common_name, ext_data = user_input_alt_name()
-    local_csr_cert = generate_csr(common_name)
-    local_ca_cert = load_ca_file("cert")
-    local_ca_key = load_ca_file("key")
-    sign_certificate_request(local_csr_cert, local_ca_cert, local_ca_key, ext_data)
+    sign_certificate_request(generate_csr(common_name), load_ca_file("cert"), load_ca_file("key"), ext_data)
 
 
 if __name__ == "__main__":
