@@ -1,18 +1,19 @@
 import datetime
 import re
+import config
+import os
 
 from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import rsa
 from ipaddress import IPv4Address, IPv6Address
-import config
 
 
 def load_ca_file(file_type):
     try:
         if file_type == 'cert':
-            with open("root_cert.crt", "rb") as f:
+            with open(config.ROOT_CERT_FILE, "rb") as f:
                 return x509.load_pem_x509_certificate(f.read())
     except FileNotFoundError:
         print("Can't find root cert File, it should be called root_cert.crt in the same directory.")
@@ -24,14 +25,13 @@ def load_ca_file(file_type):
             exit(114514)
     try:
         if file_type == 'key':
-            with open("root_key.pem", "rb") as f:
+            with open(config.ROOT_KEY_FILE, "rb") as f:
                 return serialization.load_pem_private_key(f.read(), None)
     except FileNotFoundError:
         print("Can't find root key file, it should be called root_cert.cert in the same directory.")
         select = input("Do you want to create root certificate? (y/N)")
         if select == "y" or select == "Y":
             create_root_certificate()
-            exit(114514)
         else:
             exit(114514)
 
@@ -42,7 +42,9 @@ def generate_csr(common_name):
         key_size=2048,
     )
     try:
-        with open("key.pem", "wb") as f:
+        key_path = config.OUTPUT_PATH + "/" + common_name + "/" + common_name + ".pem"
+        os.makedirs(os.path.dirname(key_path), exist_ok=True)
+        with open(key_path, "wb") as f:
             f.write(key.private_bytes(
                 encoding=serialization.Encoding.PEM,
                 format=serialization.PrivateFormat.TraditionalOpenSSL,
@@ -63,7 +65,8 @@ def generate_csr(common_name):
     return csr
 
 
-def sign_certificate_request(csr_cert, ca_cert, private_ca_key, ext_data):
+def sign_certificate_request(ca_cert, private_ca_key, common_name, ext_data):
+    csr_cert = generate_csr(common_name)
     cert = x509.CertificateBuilder().subject_name(
         csr_cert.subject
     ).issuer_name(
@@ -75,7 +78,7 @@ def sign_certificate_request(csr_cert, ca_cert, private_ca_key, ext_data):
     ).not_valid_before(
         datetime.datetime.utcnow()
     ).not_valid_after(
-        datetime.datetime.utcnow() + datetime.timedelta(days=config.VALID_TIME)
+        datetime.datetime.utcnow() + datetime.timedelta(days=config.VALID_DAYS)
         # Sign our certificate with our private key
     ).add_extension(
         x509.SubjectAlternativeName(ext_data),
@@ -85,7 +88,9 @@ def sign_certificate_request(csr_cert, ca_cert, private_ca_key, ext_data):
 
     # return DER certificate
     try:
-        with open("cert.crt", "wb") as f:
+        cert_path = config.OUTPUT_PATH + "/" + common_name + "/" + common_name + ".crt"
+        os.makedirs(os.path.dirname(cert_path), exist_ok=True)
+        with open(cert_path, "wb") as f:
             f.write(cert.public_bytes(serialization.Encoding.PEM))
     except IOError:
         print("Unable write to file!")
@@ -94,7 +99,7 @@ def sign_certificate_request(csr_cert, ca_cert, private_ca_key, ext_data):
 
 
 def check_is_ip(data):
-    p = re.compile('^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$')
+    p = re.compile(r'^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$')
     if p.match(data):
         return True
     else:
@@ -107,7 +112,6 @@ def user_input_alt_name():
     common_name = ""
     print("Please enter the domain or ip address you want to create in the cert")
     print("Enter 1 domain or IP address each time, press ENTER to end")
-
     while True:
         input_data = input()
         if count == 0:
@@ -121,9 +125,13 @@ def user_input_alt_name():
             except ValueError:
                 print("Illegal IP address! Please try again")
         else:
-            data.append(x509.DNSName(input_data))
+            try:
+                data.append(x509.DNSName(input_data))
+            except ValueError:
+                print("IDN current not supported!, please convert to punycode first")
         print("current domain or ipaddress:", end="")
         print(data)
+    common_name = common_name.replace("*", "_")
     return common_name, data
 
 
@@ -159,7 +167,7 @@ def create_root_certificate():
     ).not_valid_before(
         datetime.datetime.utcnow()
     ).not_valid_after(
-        datetime.datetime.utcnow() + datetime.timedelta(days=10)
+        datetime.datetime.utcnow() + datetime.timedelta(days=config.VALID_DAYS)
     ).sign(key, hashes.SHA256())
     # Write our certificate out to disk.
     try:
@@ -175,13 +183,26 @@ def create_root_certificate():
     except IOError:
         print("Unable write to file!")
         exit(114514)
-    print("Success create root certificate")
+    print("Success create root certificate, now you can run this program again to create user certificates")
+
+
+def generate_fullchain(common_name):
+    with open(config.OUTPUT_PATH + "/" + common_name + "/" + common_name + ".crt", 'r') as f:
+        new_cert = f.read()
+    with open(config.ROOT_CERT_FILE, "r") as f:
+        ca_cert = f.read()
+
+    fullchain = new_cert
+    fullchain += ca_cert
+
+    with open(config.OUTPUT_PATH + "/" + common_name + "/" + common_name + "_fullchain" + ".crt", 'w') as f:
+        f.write(fullchain)
 
 
 def main():
     common_name, ext_data = user_input_alt_name()
-    sign_certificate_request(generate_csr(common_name), load_ca_file("cert"), load_ca_file("key"), ext_data)
-    # create_root_certificate()
+    sign_certificate_request(load_ca_file("cert"), load_ca_file("key"), common_name, ext_data)
+    generate_fullchain(common_name)
 
 
 if __name__ == "__main__":
