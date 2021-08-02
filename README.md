@@ -8,6 +8,10 @@
 
 ## 使用方法:
 
+直接使用打包好的 exe 文件: https://github.com/NimaQu/EasyRootCA/releases
+
+直接运行源代码：
+
 环境: Python 3.9
 
 ```
@@ -24,7 +28,7 @@ IPv4 证书和域名证书均可创建，如果为 [IDN 域名 ](https://zh.wiki
 
 ### Todo:
 
-IPv6 支持
+- [ ] IPv6 支持
 
-使用 Github Action 自动编译成各平台可执行文件
+- [x] 使用 Github Action 自动编译成~~各平台~~ Windows 可执行文件
 

@@ -2,9 +2,12 @@ name: Package Application with Pyinstaller and release
 
 on:
   push:
-    branches: [ master ]
+    branches:
+      - main
   pull_request:
-    branches: [ master ]
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
   build:
@@ -18,22 +21,14 @@ jobs:
       with:
         path: ./
 
-    - name: Package Linux Application
-      uses: JackMcKew/pyinstaller-action-linux@main
-      with:
-        path: ./
-
     - name: package to zip files
       run: |
-        cp config.ini.example dist/windows
-        cp config.ini.example dist/linux
-        zip -r dist/Windows.zip dist/windows
-        zip -r dist/Linux.zip dist/linux
+        sudo cp config.ini.example dist/windows
+        sudo zip -r ./dist/Windows.zip ./dist/windows
 
     - name: Release
       uses: softprops/action-gh-release@v1
       if: startsWith(github.ref, 'refs/tags/')
       with:
         files: |
-          dist/Windows.zip
-          dist/Linux.zip
+          ./dist/Windows.zip
