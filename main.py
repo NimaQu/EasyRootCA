@@ -10,7 +10,14 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from ipaddress import IPv4Address, IPv6Address
 
 config = configparser.ConfigParser()
-config.read('config.ini', encoding="utf-8")
+try:
+    with open('config.ini', encoding="utf-8") as f:
+        config.read_file(f)
+except FileNotFoundError:
+    print(
+        "config file is missing, please download from "
+        "https://raw.githubusercontent.com/NimaQu/EasyRootCA/main/config.ini.example and rename to config.ini")
+    exit(114514)
 
 
 def load_ca_file(file_type):
@@ -198,7 +205,8 @@ def generate_fullchain(common_name):
     fullchain = new_cert
     fullchain += ca_cert
 
-    with open(config["general"]["OUTPUT_PATH"] + "/" + common_name + "/" + common_name + "_fullchain" + ".crt", 'w') as f:
+    with open(config["general"]["OUTPUT_PATH"] + "/" + common_name + "/" + common_name + "_fullchain" + ".crt",
+              'w') as f:
         f.write(fullchain)
 
 

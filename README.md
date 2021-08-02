@@ -13,7 +13,7 @@
 ```
 git clone https://github.com/NimaQu/EasyRootCA.git
 pip3 install cryptography
-cp config.example.py config.py
+cp config.ini.example config.ini
 nano config.py #修改成你需要的值
 python3 main.py
 ```
