@@ -1,6 +1,6 @@
 import datetime
 import re
-import config
+import configparser
 import os
 
 from cryptography import x509
@@ -9,11 +9,14 @@ from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import rsa
 from ipaddress import IPv4Address, IPv6Address
 
+config = configparser.ConfigParser()
+config.read('config.ini', encoding="utf-8")
+
 
 def load_ca_file(file_type):
     try:
         if file_type == 'cert':
-            with open(config.ROOT_CERT_FILE, "rb") as f:
+            with open(config["general"]["ROOT_CERT_FILE"], "rb") as f:
                 return x509.load_pem_x509_certificate(f.read())
     except FileNotFoundError:
         print("Can't find root cert File, it should be called root_cert.crt in the same directory.")
@@ -25,7 +28,7 @@ def load_ca_file(file_type):
             exit(114514)
     try:
         if file_type == 'key':
-            with open(config.ROOT_KEY_FILE, "rb") as f:
+            with open(config["general"]["ROOT_KEY_FILE"], "rb") as f:
                 return serialization.load_pem_private_key(f.read(), None)
     except FileNotFoundError:
         print("Can't find root key file, it should be called root_cert.cert in the same directory.")
@@ -42,7 +45,7 @@ def generate_csr(common_name):
         key_size=2048,
     )
     try:
-        key_path = config.OUTPUT_PATH + "/" + common_name + "/" + common_name + ".pem"
+        key_path = config["general"]["OUTPUT_PATH"] + "/" + common_name + "/" + common_name + ".pem"
         os.makedirs(os.path.dirname(key_path), exist_ok=True)
         with open(key_path, "wb") as f:
             f.write(key.private_bytes(
@@ -56,10 +59,10 @@ def generate_csr(common_name):
 
     csr = x509.CertificateSigningRequestBuilder().subject_name(x509.Name([
         # Provide various details about who we are.
-        x509.NameAttribute(NameOID.COUNTRY_NAME, config.COUNTRY_NAME),
-        x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, config.STATE_OR_PROVINCE_NAME),
-        x509.NameAttribute(NameOID.LOCALITY_NAME, config.LOCALITY_NAME),
-        x509.NameAttribute(NameOID.ORGANIZATION_NAME, config.ORGANIZATION_NAME),
+        x509.NameAttribute(NameOID.COUNTRY_NAME, config["CertInfo"]["COUNTRY_NAME"]),
+        x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, config["CertInfo"]["STATE_OR_PROVINCE_NAME"]),
+        x509.NameAttribute(NameOID.LOCALITY_NAME, config["CertInfo"]["LOCALITY_NAME"]),
+        x509.NameAttribute(NameOID.ORGANIZATION_NAME, config["CertInfo"]["ORGANIZATION_NAME"]),
         x509.NameAttribute(NameOID.COMMON_NAME, common_name),
     ])).sign(key, hashes.SHA256())
     return csr
@@ -78,7 +81,7 @@ def sign_certificate_request(ca_cert, private_ca_key, common_name, ext_data):
     ).not_valid_before(
         datetime.datetime.utcnow()
     ).not_valid_after(
-        datetime.datetime.utcnow() + datetime.timedelta(days=config.VALID_DAYS)
+        datetime.datetime.utcnow() + datetime.timedelta(days=int(config["general"]["VALID_DAYS"]))
         # Sign our certificate with our private key
     ).add_extension(
         x509.SubjectAlternativeName(ext_data),
@@ -88,7 +91,7 @@ def sign_certificate_request(ca_cert, private_ca_key, common_name, ext_data):
 
     # return DER certificate
     try:
-        cert_path = config.OUTPUT_PATH + "/" + common_name + "/" + common_name + ".crt"
+        cert_path = config["general"]["OUTPUT_PATH"] + "/" + common_name + "/" + common_name + ".crt"
         os.makedirs(os.path.dirname(cert_path), exist_ok=True)
         with open(cert_path, "wb") as f:
             f.write(cert.public_bytes(serialization.Encoding.PEM))
@@ -167,7 +170,7 @@ def create_root_certificate():
     ).not_valid_before(
         datetime.datetime.utcnow()
     ).not_valid_after(
-        datetime.datetime.utcnow() + datetime.timedelta(days=config.VALID_DAYS)
+        datetime.datetime.utcnow() + datetime.timedelta(days=int(config["general"]["VALID_DAYS"]))
     ).sign(key, hashes.SHA256())
     # Write our certificate out to disk.
     try:
@@ -187,15 +190,15 @@ def create_root_certificate():
 
 
 def generate_fullchain(common_name):
-    with open(config.OUTPUT_PATH + "/" + common_name + "/" + common_name + ".crt", 'r') as f:
+    with open(config["general"]["OUTPUT_PATH"] + "/" + common_name + "/" + common_name + ".crt", 'r') as f:
         new_cert = f.read()
-    with open(config.ROOT_CERT_FILE, "r") as f:
+    with open(config["general"]["ROOT_CERT_FILE"], "r") as f:
         ca_cert = f.read()
 
     fullchain = new_cert
     fullchain += ca_cert
 
-    with open(config.OUTPUT_PATH + "/" + common_name + "/" + common_name + "_fullchain" + ".crt", 'w') as f:
+    with open(config["general"]["OUTPUT_PATH"] + "/" + common_name + "/" + common_name + "_fullchain" + ".crt", 'w') as f:
         f.write(fullchain)
 
 
